@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
     </body></html>`);
 });
 
-// Larger pool of questions
+// Question Pool
 const allQuestions = [
     { id: "mood", question: "How are you feeling today?", options: ["Happy", "Anxious", "Tired", "Excited"] },
     { id: "sleep", question: "How well did you sleep last night?", options: ["Very well", "Okay", "Not great", "Terrible"] },
@@ -24,18 +24,37 @@ const allQuestions = [
     { id: "hydration", question: "How much water have you had today?", options: ["Plenty", "Enough", "Not much", "Very little"] }
 ];
 
-// Function to randomly select 4 questions
+// Utility to pick random 4 questions
 function getRandomQuestions() {
     return allQuestions.sort(() => 0.5 - Math.random()).slice(0, 4);
 }
 
-// Sentiment Analysis using vader-sentiment
-function getSentiment(text) {
-    const sentiment = vader.SentimentIntensityAnalyzer.polarity_scores(text);
-    return sentiment;
+// Utility to convert answer to sentiment level
+function mapAnswerToSentiment(questionId, answer) {
+    const mappings = {
+        hydration: {
+            "Plenty": "positive",
+            "Enough": "neutral",
+            "Not much": "neutral",
+            "Very little": "negative"
+        },
+        diet: {
+            "Very balanced": "positive",
+            "Somewhat balanced": "neutral",
+            "Not great": "neutral",
+            "Poor": "negative"
+        },
+        physical: {
+            "Very active": "positive",
+            "Somewhat active": "neutral",
+            "Sedentary": "neutral",
+            "Exhausted": "negative"
+        }
+    };
+    return mappings[questionId]?.[answer] || "neutral";
 }
 
-// Recommendations based on specific conditions
+// Static recommendations
 const recommendations = {
     general: "Maintain a balanced routine with proper rest, hydration, and light physical activity.",
     positive: "You're doing great! Keep up with self-care, light exercise, and mindfulness.",
@@ -44,17 +63,16 @@ const recommendations = {
     high_stress: "Your stress levels seem high. Deep breathing exercises, prenatal yoga, or talking to a healthcare provider could help. If you're feeling overwhelmed, please reach out to a professional."
 };
 
-// Dynamic Suggestions for Diet, Hydration, Physical Activity
-const dietSuggestions = {
-    positive: "Great job on maintaining a healthy and balanced diet! Keep including a variety of fruits, vegetables, and whole grains.",
-    neutral: "Consider incorporating more fruits and vegetables into your meals for better energy and nutrition.",
-    negative: "Your diet might need some improvement. Try focusing on a more balanced approach with whole foods, and avoid processed meals."
-};
-
 const hydrationSuggestions = {
     positive: "You're staying well-hydrated! Keep drinking plenty of water throughout the day to stay energized.",
     neutral: "Make sure to drink more water, especially if you're feeling tired or experiencing dry skin.",
     negative: "You might be dehydrated. Try to drink more water to keep your body and skin healthy, especially during pregnancy."
+};
+
+const dietSuggestions = {
+    positive: "Great job on maintaining a healthy and balanced diet! Keep including a variety of fruits, vegetables, and whole grains.",
+    neutral: "Consider incorporating more fruits and vegetables into your meals for better energy and nutrition.",
+    negative: "Your diet might need some improvement. Try focusing on a more balanced approach with whole foods, and avoid processed meals."
 };
 
 const physicalActivitySuggestions = {
@@ -63,7 +81,6 @@ const physicalActivitySuggestions = {
     negative: "It's important to stay moving, even if it's just a short walk or some light stretching. Speak to your healthcare provider for safe exercises."
 };
 
-// Define daily well-being tips
 const dailyTips = [
     "Drink plenty of water to stay hydrated and reduce fatigue.",
     "Incorporate short walks into your routine to boost circulation.",
@@ -72,7 +89,6 @@ const dailyTips = [
     "Maintain a balanced diet rich in fruits, vegetables, and whole grains."
 ];
 
-// Define podcast and yoga suggestions based on mood
 const podcastSuggestions = {
     positive: `<ul><li><a href="https://pregnancypodcast.com/" target="_blank">Pregnancy Podcast</a></li><li><a href="https://www.themotherkindpodcast.com/" target="_blank">The Motherkind Podcast</a></li></ul>`,
     neutral: `<ul><li><a href="https://www.birthful.com/podcast/" target="_blank">The Birthful Podcast</a></li><li><a href="https://pregnancypodcast.com/" target="_blank">Pregnancy Podcast</a></li></ul>`,
@@ -101,63 +117,63 @@ app.get("/quiz", (req, res) => {
     res.send(`<html><head><title>Quiz</title></head><body>${quizForm}</body></html>`);
 });
 
-// Process Quiz and Provide Suggestions
+// Analyze Route
 app.post("/analyze", (req, res) => {
     let totalScore = 0;
     let responses = [];
-    let mood = "neutral"; // Default mood
-    let stressLevel = "neutral"; // Default stress level
+    let mood = "neutral";
+    let stressLevel = "neutral";
     let hydration = req.body.hydration;
     let diet = req.body.diet;
     let physical = req.body.physical;
 
-    // Analyze responses with VADER Sentiment
+    // Analyze sentiment
     allQuestions.forEach(q => {
         let answer = req.body[q.id];
         if (answer) {
-            const sentiment = getSentiment(answer);
-            const sentimentScore = sentiment.compound; // VADER compound score
-            totalScore += sentimentScore;
-            responses.push({ question: q.question, answer: answer, sentimentScore: sentimentScore });
+            const sentiment = vader.SentimentIntensityAnalyzer.polarity_scores(answer);
+            const score = sentiment.compound;
+            totalScore += score;
+            responses.push({ question: q.question, answer: answer, sentimentScore: score });
         }
     });
 
-    // Determine mood based on sentiment score
-    if (totalScore >= 0.2) {
-        mood = "positive";
-    } else if (totalScore <= -0.2) {
-        mood = "negative";
-    }
+    // Mood based on score
+    if (totalScore >= 0.2) mood = "positive";
+    else if (totalScore <= -0.2) mood = "negative";
 
-    // Determine stress level based on the response to the "stress" question
-    if (req.body.stress === "Moderate") {
-        stressLevel = "moderate";
-    } else if (req.body.stress === "Very stressed") {
-        stressLevel = "high";
-    }
+    // Stress level
+    if (req.body.stress === "Moderate") stressLevel = "moderate";
+    else if (req.body.stress === "Very stressed") stressLevel = "high";
 
-    // Generate dynamic suggestions based on mood, hydration, diet, and physical activity
-    let moodSuggestion = recommendations[mood] || recommendations["general"];
-    let hydrationSuggestion = hydration ? hydrationSuggestions[mood] || hydrationSuggestions["neutral"] : "";
-    let dietSuggestion = diet ? dietSuggestions[mood] || dietSuggestions["neutral"] : "";
-    let physicalActivitySuggestion = physical ? physicalActivitySuggestions[mood] || physicalActivitySuggestions["neutral"] : "";
+    // Specific tips
+    const hydrationMood = mapAnswerToSentiment("hydration", hydration);
+    const dietMood = mapAnswerToSentiment("diet", diet);
+    const physicalMood = mapAnswerToSentiment("physical", physical);
 
-    let randomTip = dailyTips[Math.floor(Math.random() * dailyTips.length)];
+    const hydrationSuggestion = hydration ? hydrationSuggestions[hydrationMood] : "";
+    const dietSuggestion = diet ? dietSuggestions[dietMood] : "";
+    const physicalActivitySuggestion = physical ? physicalActivitySuggestions[physicalMood] : "";
+
+    const randomTip = dailyTips[Math.floor(Math.random() * dailyTips.length)];
+    const extraStressTip = stressLevel === "high" ? `<h3>High Stress Advice:</h3><p>${recommendations["high_stress"]}</p>` : "";
 
     res.send(`<html><head><title>Suggestions</title></head><body>
         <h2>Your Personalized Pregnancy Well-being Advice</h2>
-        <p>${moodSuggestion}</p>
+        <p>${recommendations[mood]}</p>
         ${hydration ? `<h3>Hydration Tip:</h3><p>${hydrationSuggestion}</p>` : ""}
         ${diet ? `<h3>Diet Tip:</h3><p>${dietSuggestion}</p>` : ""}
         ${physical ? `<h3>Physical Activity Tip:</h3><p>${physicalActivitySuggestion}</p>` : ""}
-        <h3>Recommended Podcasts:</h3>${podcastSuggestions[mood] || podcastSuggestions["positive"]}
-        <h3>Prenatal Yoga Exercises:</h3>${yogaSuggestions[mood] || yogaSuggestions["positive"]}
+        ${extraStressTip}
+        <h3>Recommended Podcasts:</h3>${podcastSuggestions[mood]}
+        <h3>Prenatal Yoga Exercises:</h3>${yogaSuggestions[mood]}
         <h3>Daily Well-being Tip:</h3><p>${randomTip}</p>
         <h3>Your Responses and Sentiment Analysis:</h3>
-        <ul>${responses.map(r => `<li><b>${r.question}</b>: ${r.answer} (Sentiment Score: ${r.sentimentScore})</li>`).join('')}</ul>
+        <ul>${responses.map(r => `<li><b>${r.question}</b>: ${r.answer} (Sentiment Score: ${r.sentimentScore.toFixed(2)})</li>`).join('')}</ul>
         <button onclick="window.location.href='/quiz'">Take the Quiz Again</button>
     </body></html>`);
 });
 
-const PORT = process.env.PORT || 5000;
+// Start Server
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
