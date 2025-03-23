@@ -1,4 +1,11 @@
 const express = require("express");
+const cors = require("cors"); // ✅ Allow frontend to access backend
+const bodyParser = require("body-parser");
+
+
+
+
+/*const express = require("express");
 const bodyParser = require("body-parser");
 const vader = require("vader-sentiment");
 
@@ -174,6 +181,38 @@ app.post("/analyze", (req, res) => {
     </body></html>`);
 });
 
+
+/*app.get("/test", (req, res) => {
+    res.json({ message: "Frontend connected to Backend successfully!", status: "success" });
+});
+
 // Start Server
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+*/
+
+
+
+const app = express();
+app.use(cors()); // ✅ Allow frontend to access backend
+app.use(bodyParser.json());
+
+// ✅ Updated API to return JSON-formatted questions
+app.get("/api/quiz", (req, res) => {
+    const allQuestions = [
+        { id: "mood", question: "How are you feeling today?", options: ["Happy", "Anxious", "Tired", "Excited"] },
+        { id: "sleep", question: "How well did you sleep last night?", options: ["Very well", "Okay", "Not great", "Terrible"] },
+        { id: "stress", question: "Are you experiencing any stress?", options: ["Not at all", "A little", "Moderate", "Very stressed"] },
+        { id: "physical", question: "How active have you been today?", options: ["Very active", "Somewhat active", "Sedentary", "Exhausted"] },
+        { id: "diet", question: "How balanced was your diet today?", options: ["Very balanced", "Somewhat balanced", "Not great", "Poor"] },
+        { id: "hydration", question: "How much water have you had today?", options: ["Plenty", "Enough", "Not much", "Very little"] }
+    ];
+
+    // ✅ Send 4 random questions as JSON
+    const selectedQuestions = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 4);
+    res.json({ questions: selectedQuestions });
+});
+
+// ✅ Start Server
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
