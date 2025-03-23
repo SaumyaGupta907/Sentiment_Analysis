@@ -104,12 +104,12 @@ app.post("/api/analyze", (req, res) => {
     let { answers } = req.body;
 
     // ✅ Analyze sentiment of answers
-    Object.entries(answers).forEach(([questionId, answer]) => {
+    /*Object.entries(answers).forEach(([questionId, answer]) => {
         const sentiment = vader.SentimentIntensityAnalyzer.polarity_scores(answer);
         const score = sentiment.compound;
         totalScore += score;
         responses.push({ question: allQuestions.find(q => q.id === questionId)?.question, answer, sentimentScore: score });
-    });
+    });*/
 
     // ✅ Determine Mood
     if (totalScore >= 0.2) mood = "positive";
